@@ -79,7 +79,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Prepare env
-        run: cp .env.example .env
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            printf '%s\n' \
+              "POSTGRES_USER=postgres" \
+              "POSTGRES_PASSWORD=postgres" \
+              "POSTGRES_DB=postgres" \
+              "POSTGRES_HOST=db" \
+              "POSTGRES_PORT=5432" \
+              "" \
+              "KEYCLOAK_ADMIN=admin" \
+              "KEYCLOAK_ADMIN_PASSWORD=admin-pass" \
+              "KEYCLOAK_HOSTNAME=localhost" \
+              "" \
+              "APP_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/postgres" \
+              "APP_KEYCLOAK_ISSUER=https://localhost/realms/books" \
+              "APP_JWKS_URL=http://keycloak:8080/realms/books/protocol/openid-connect/certs" \
+              "APP_REQUIRE_HTTPS=false" \
+              "APP_STRICT_SECURITY=false" \
+              "" \
+              "OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318" \
+              "OTEL_SERVICE_NAME=books-api" \
+              "APP_CORS_ORIGINS=" \
+              "PYROSCOPE_SERVER_ADDRESS=http://pyroscope:4040" \
+              "PYROSCOPE_APP_NAME=books-api" \
+              "" \
+              "GRAFANA_ADMIN_USER=admin" \
+              "GRAFANA_ADMIN_PASSWORD=admin" \
+              "" \
+              "VAULT_DEV_ROOT_TOKEN_ID=root" \
+              "VAULT_ADDR=http://vault:8200" \
+              > .env
+          fi
       - name: Start core services for integration
         run: docker compose up -d db keycloak tempo otel-collector loki victoria-metrics pyroscope
       - name: Wait for services
@@ -148,7 +181,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@v0.22.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: local/build:latest
           severity: CRITICAL,HIGH
