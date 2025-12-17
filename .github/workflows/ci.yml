@@ -41,7 +41,7 @@ jobs:
       packages: write
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: ghcr.io/Moderation-is-good/play-with-ai
+      IMAGE_NAME: ghcr.io/moderation-is-good/play-with-ai
     steps:
       - name: Checkout
         uses: actions/checkout@v4
