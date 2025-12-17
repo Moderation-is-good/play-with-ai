@@ -1,11 +1,13 @@
+import json
 import time
 from typing import Any, Dict, Iterable, Set
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwk, jwt
-from jose.utils import base64url_decode
+from jwt.algorithms import RSAAlgorithm
+from jwt.utils import base64url_decode
 
 bearer = HTTPBearer(auto_error=True)
 
@@ -67,27 +69,25 @@ class AuthVerifier:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown signing key")
 
         try:
-            public_key = jwk.construct(key_data)
-            message, encoded_sig = token.rsplit(".", 1)
-            decoded_sig = base64url_decode(encoded_sig.encode())
-            if not public_key.verify(message.encode(), decoded_sig):
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad signature")
-            claims = jwt.get_unverified_claims(token)
+            if key_data.get("kty") == "oct":
+                # Symmetric JWKS entry: decode shared secret
+                key = base64url_decode(key_data["k"].encode())
+            else:
+                key = RSAAlgorithm.from_jwk(json.dumps(key_data))
+
+            claims = jwt.decode(
+                token,
+                key=key,
+                algorithms=list(self.allowed_algs),
+                audience=self.audience,
+                issuer=self.issuer,
+                leeway=self.clock_skew_seconds,
+                options={"require": ["exp", "iss", "aud"]},
+            )
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
-
-        if claims.get("iss") != self.issuer:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad issuer")
-
-        aud_claim = claims.get("aud")
-        audiences = [aud_claim] if isinstance(aud_claim, str) else aud_claim or []
-        if self.audience not in audiences:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bad audience")
-
-        if time.time() > claims.get("exp", 0) + self.clock_skew_seconds:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
 
         return claims
 

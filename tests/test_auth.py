@@ -2,10 +2,10 @@ import time
 from typing import List
 
 import pytest
+import jwt
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
-from jose import jwt
-from jose.utils import base64url_encode
+from jwt.utils import base64url_encode
 
 from src.auth import AuthVerifier, JWKSCache, require_scope
 
