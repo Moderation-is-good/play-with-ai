@@ -1,0 +1,133 @@
+name: Quality and Safety
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit bandit
+      - name: Unit tests (no integration)
+        run: pytest -m "not integration"
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+      - name: Security lint (bandit)
+        run: bandit -q -r src
+      - name: pip-audit
+        run: pip-audit -r requirements.txt
+
+  integration_and_smoke:
+    runs-on: ubuntu-latest
+    needs: lint_and_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare env
+        run: cp .env.example .env
+      - name: Start core services for integration
+        run: docker compose up -d db keycloak tempo otel-collector loki victoria-metrics pyroscope
+      - name: Wait for services
+        run: |
+          sleep 30
+          curl -sf http://localhost:8080/realms/books/.well-known/openid-configuration >/dev/null
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Integration tests
+        run: pytest -m integration
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+      - name: Observability smoke (emit trace and verify Tempo)
+        run: |
+          python - <<'PY'
+          import time, json, sys
+          from opentelemetry import trace
+          from opentelemetry.sdk.resources import Resource
+          from opentelemetry.sdk.trace import TracerProvider
+          from opentelemetry.sdk.trace.export import BatchSpanProcessor
+          from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+          from opentelemetry.trace import format_trace_id
+
+          provider = TracerProvider(resource=Resource.create({"service.name": "ci-smoke"}))
+          provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint="http://localhost:4318/v1/traces")))
+          trace.set_tracer_provider(provider)
+          tracer = trace.get_tracer(__name__)
+          with tracer.start_as_current_span("ci-span") as span:
+              tid = format_trace_id(span.get_span_context().trace_id)
+          provider.shutdown()
+          time.sleep(5)
+          import urllib.request
+          resp = urllib.request.urlopen(f"http://localhost:3200/api/traces/{tid}")
+          data = resp.read()
+          parsed = json.loads(data)
+          if "batches" not in parsed:
+              sys.exit("Tempo trace fetch failed")
+          print("tempo trace ok", tid)
+          PY
+
+  docker_build_and_scan:
+    runs-on: ubuntu-latest
+    needs: lint_and_test
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: local/build:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.22.0
+        with:
+          image-ref: local/build:latest
+          severity: CRITICAL,HIGH
+
+  terraform_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform fmt/validate
+        run: |
+          terraform fmt -check -recursive infra
+          (cd infra/terraform/keycloak && terraform init -backend=false && terraform validate)
+
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hadolint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source . --no-git --verbose
