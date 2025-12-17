@@ -13,6 +13,20 @@ permissions:
 jobs:
   lint_and_test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -24,10 +38,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pip-audit bandit
+      - name: Wait for Postgres
+        run: |
+          for i in {1..20}; do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 2
+          done
       - name: Unit tests (no integration)
         run: pytest -m "not integration"
         env:
           PYTHONPATH: ${{ github.workspace }}
+          APP_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
       - name: Security lint (bandit)
         run: bandit -q -r src
       - name: pip-audit
