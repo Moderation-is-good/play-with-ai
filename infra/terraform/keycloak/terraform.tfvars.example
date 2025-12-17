@@ -1,0 +1,12 @@
+kc_url = "http://localhost:8080"
+
+kc_admin_client_id     = "admin-cli"
+kc_admin_client_secret = ""
+
+realm         = "books"
+client_id     = "books-api"
+client_secret = "replace-me"
+redirect_uris = ["http://localhost:8000/docs", "http://localhost:8000/redoc"]
+web_origins   = ["http://localhost:8000"]
+
+demo_user_password = "ChangeMe123!"

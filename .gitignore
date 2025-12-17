@@ -1,0 +1,47 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Build / dist
+build/
+dist/
+pip-wheel-metadata/
+*.egg
+
+# Environments / secrets
+.env
+.env.*
+.venv/
+venv/
+
+# Coverage / reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Logs
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+*.tfplan
+*.tfstate.backup
+crash.log
+override.tf
+override.tf.json

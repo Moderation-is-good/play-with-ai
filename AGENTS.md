@@ -1,0 +1,34 @@
+# Repository Guidelines
+
+This repo is intentionally lightweight; add new code using the structure below so growth stays predictable.
+
+## Project Structure & Module Organization
+- Keep runtime code in `src/` (grouped by domain, e.g., `src/auth/`, `src/api/`, `src/ui/`).
+- Place automated tests in `tests/`, mirroring the `src/` path; sample data and fixtures live in `tests/fixtures/`.
+- Long-form docs and decision notes go in `docs/`; reusable scripts belong in `scripts/`; static assets in `assets/`.
+- Keep configuration at the repo root (`Makefile`, `.env.example`, dependency manifests) and favor small, cohesive modules over monolith files.
+
+## Build, Test, and Development Commands
+- Prefer a `Makefile` (or `justfile`) as a single entrypoint; add/update these targets when tooling is added:
+  - `make setup` installs dependencies; `make dev` runs the local server/watcher; `make lint` and `make format` enforce style; `make test` runs the suite; `make check` chains lint + tests.
+- If the stack is Node, expose `npm run dev|test|lint`; for Python, mirror with `pip install -r requirements.txt` and `pytest`.
+
+## Coding Style & Naming Conventions
+- JavaScript/TypeScript: 2-space indent, single quotes, trailing commas where allowed, semicolons on; Python: 4-space indent, Black-compatible.
+- Use camelCase for variables/functions, PascalCase for components/classes, SCREAMING_SNAKE_CASE for env vars.
+- Run formatters via `make format`; lint before commits to keep diffs small.
+
+## Testing Guidelines
+- Name tests after the unit under test (`tests/api/test_users.py`, `tests/ui/Button.spec.ts`); prefer table-driven cases for edge coverage.
+- Add a regression test with every bug fix; aim for ≥85% coverage on critical modules.
+- Run `make test` (or the language-specific equivalent) before opening a PR.
+
+## Commit & Pull Request Guidelines
+- Use Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`) with concise scopes; group large refactors under `refactor:`.
+- PRs should include: scope/intent, a short summary of changes, tests executed, and screenshots for UI work; keep PRs small and link related issues.
+- Run `make check` before pushing; avoid committing generated files and secrets.
+
+## Security & Configuration Tips
+- Never commit secrets; add placeholders to `.env.example` and keep `.env*` ignored.
+- Pin dependencies and document required versions; note any system packages in `docs/setup.md`.
+- Prefer local configuration files over global machine state; surface breaking changes in the changelog or PR description.
