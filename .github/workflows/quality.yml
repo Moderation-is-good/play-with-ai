@@ -115,6 +115,10 @@ jobs:
           fi
       - name: Start core services for integration
         run: docker compose up -d db keycloak tempo otel-collector loki victoria-metrics pyroscope
+      - name: Install Postgres client (integration)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
       - name: Wait for services
         run: |
           sleep 30
@@ -181,7 +185,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: local/build:latest
           severity: CRITICAL,HIGH
