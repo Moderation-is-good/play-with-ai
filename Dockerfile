@@ -24,7 +24,32 @@ RUN uv pip install --system -r requirements.txt
 
 COPY src ./src
 # Strip __pycache__ to shrink image (guarded for platform Python path)
-RUN python - <<'PY'\nimport sys, subprocess, pathlib\nroot = pathlib.Path('/usr/local/lib')\nversion_dir = root / f\"python{sys.version_info.major}.{sys.version_info.minor}\"\nif version_dir.exists():\n    subprocess.run(['find', str(version_dir), '-type', 'd', '-name', '__pycache__', '-prune', '-exec', 'rm', '-rf', '{}', '+'], check=True)\nPY
+RUN python - <<'PY'
+import pathlib
+import subprocess
+import sys
+
+root = pathlib.Path("/usr/local/lib")
+version_dir = root / f"python{sys.version_info.major}.{sys.version_info.minor}"
+if version_dir.exists():
+    subprocess.run(
+        [
+            "find",
+            str(version_dir),
+            "-type",
+            "d",
+            "-name",
+            "__pycache__",
+            "-prune",
+            "-exec",
+            "rm",
+            "-rf",
+            "{}",
+            "+",
+        ],
+        check=True,
+    )
+PY
 
 # Runtime image stays slim and non-root
 FROM python:3.14-slim AS runtime
