@@ -5,7 +5,6 @@ import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from jwt.utils import base64url_encode
-
 from src.auth import AuthVerifier, JWKSCache, require_scope
 
 

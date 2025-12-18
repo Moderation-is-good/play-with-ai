@@ -4,7 +4,6 @@ import httpx
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-
 from src.app import app, get_book_service, read_access, write_access
 from src.db import Base, get_engine, get_session
 from src.models import UpdateBook

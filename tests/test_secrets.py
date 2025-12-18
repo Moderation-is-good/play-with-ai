@@ -1,6 +1,5 @@
 import httpx
 import pytest
-
 from src.secrets import fetch_vault_secret
 
 
