@@ -71,11 +71,11 @@ jobs:
           if-no-files-found: error
 
       - name: Install cosign
-        if: ${{ secrets.COSIGN_KEY != '' }}
+        if: github.event_name == 'push'
         uses: sigstore/cosign-installer@v3.6.0
 
       - name: Cosign sign (keyless if no key provided)
-        if: ${{ secrets.COSIGN_KEY != '' || github.actor != '' }}
+        if: github.event_name == 'push'
         env:
           COSIGN_EXPERIMENTAL: "1"
           COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
