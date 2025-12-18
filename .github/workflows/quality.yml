@@ -89,7 +89,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pip-audit bandit
+          pip install pip-audit bandit pytest-cov ruff mypy
       - name: Wait for Postgres
         run: |
           for i in {1..60}; do
@@ -103,11 +103,24 @@ jobs:
           docker ps -a
           docker logs $(docker ps -aq --filter "name=postgres")
           exit 1
-      - name: Unit tests (no integration)
-        run: pytest -m "not integration"
+      - name: Unit tests with coverage
+        run: pytest -m "not integration" --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=70
         env:
           PYTHONPATH: ${{ github.workspace }}
           APP_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Ruff lint
+        run: ruff check src tests
+      - name: Ruff format check
+        run: ruff format --check src tests
+      - name: Type check (mypy)
+        run: mypy src --ignore-missing-imports --no-error-summary || true
       - name: Security lint (bandit)
         run: bandit -q -r src
       - name: pip-audit
@@ -302,6 +315,18 @@ jobs:
         with:
           image-ref: local/build:latest
           severity: CRITICAL,HIGH
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: local/build:latest
+          artifact-name: sbom.spdx.json
+          output-file: sbom.spdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          retention-days: 30
 
   terraform_check:
     runs-on: ubuntu-latest
@@ -322,6 +347,11 @@ jobs:
         run: |
           terraform fmt -check -recursive infra
           (cd infra/terraform/keycloak && terraform init -backend=false && terraform validate)
+      - name: tfsec security scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infra/terraform
+          soft_fail: true
 
   hadolint:
     runs-on: ubuntu-latest
@@ -374,11 +404,14 @@ jobs:
           subjectPatternError: |
             PR title must be 1-80 characters.
 
-  # gitleaks:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Gitleaks scan
-  #       uses: gitleaks/gitleaks-action@v2
-  #       with:
-  #         args: detect --source . --no-git --verbose
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

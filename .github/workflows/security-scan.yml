@@ -1,0 +1,168 @@
+name: Scheduled Security Scan
+
+on:
+  schedule:
+    # Run every Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit safety
+
+      - name: pip-audit scan
+        run: pip-audit -r requirements.txt --format json --output pip-audit-results.json || true
+
+      - name: Safety scan
+        run: safety check -r requirements.txt --json > safety-results.json || true
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: |
+            pip-audit-results.json
+            safety-results.json
+          retention-days: 30
+
+  container-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: local/security-scan:latest
+          cache-from: type=gha
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: local/security-scan:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Trivy scan (table output)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: local/security-scan:latest
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  terraform-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: tfsec scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infra/terraform
+          format: sarif
+          sarif_file: tfsec-results.sarif
+
+      - name: Upload tfsec results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'tfsec-results.sarif'
+        if: always()
+
+      - name: Checkov scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/terraform
+          framework: terraform
+          soft_fail: true
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'checkov-results.sarif'
+        if: always()
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          extra_args: --only-verified
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Bandit
+        run: pip install bandit[sarif]
+
+      - name: Bandit SAST scan
+        run: bandit -r src -f sarif -o bandit-results.sarif || true
+
+      - name: Upload Bandit results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'bandit-results.sarif'
+
+      - name: Semgrep scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/python
+          generateSarif: true
+
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()

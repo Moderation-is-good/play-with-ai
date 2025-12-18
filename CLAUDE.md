@@ -55,8 +55,19 @@ Important env vars:
 
 Tests are in `tests/` mirroring `src/` structure. Integration tests require Postgres and are marked with `@pytest.mark.integration`.
 
+## Code Quality
+
+Linting and formatting configured in `pyproject.toml`:
+```bash
+ruff check src tests      # Lint
+ruff format src tests     # Format
+mypy src                  # Type check
+```
+
+CI runs coverage with 70% minimum threshold.
+
 ## Coding Conventions
 
-- Python: 4-space indent, Black-compatible
+- Python: 4-space indent, Ruff-formatted (120 char line length)
 - camelCase for variables/functions, PascalCase for classes
-- Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
+- Conventional Commits (`feat:`, `fix:`, `chore:`, etc.) - enforced on PRs
