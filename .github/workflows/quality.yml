@@ -401,6 +401,8 @@ jobs:
         with:
           working_directory: infra/terraform
           soft_fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   hadolint:
     runs-on: ubuntu-latest
