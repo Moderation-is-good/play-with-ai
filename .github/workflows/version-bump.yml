@@ -27,7 +27,9 @@ jobs:
       bump_type: ${{ steps.analyze.outputs.bump_type }}
       current_version: ${{ steps.version.outputs.current }}
       new_version: ${{ steps.calc.outputs.new }}
+      previous_tag: ${{ steps.version.outputs.previous_tag }}
       should_bump: ${{ steps.analyze.outputs.should_bump }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,11 +38,15 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          CURRENT_VERSION="${LATEST_TAG#v}"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            CURRENT_VERSION="0.0.0"
+          else
+            CURRENT_VERSION="${LATEST_TAG#v}"
+          fi
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
+          echo "previous_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION (prev tag: $LATEST_TAG)"
 
       - name: Analyze commits for version bump
         id: analyze
@@ -163,6 +169,79 @@ jobs:
 
           echo "updated=$UPDATED" >> $GITHUB_OUTPUT
           echo "Updated version to $NEW_VERSION (updated=$UPDATED)"
+
+      - name: Update changelog
+        if: steps.update.outputs.updated == 'true'
+        env:
+          NEW_VERSION: ${{ needs.determine-bump.outputs.new_version }}
+          PREVIOUS_TAG: ${{ needs.determine-bump.outputs.previous_tag }}
+        run: |
+          python - <<'PY'
+          from textwrap import dedent
+          exec(dedent("""
+          import datetime
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          new_version = os.environ["NEW_VERSION"]
+          previous_tag = os.environ.get("PREVIOUS_TAG", "")
+          header = "# Changelog\n\n"
+
+          if previous_tag:
+              rev_range = f"{previous_tag}..HEAD"
+          else:
+              rev_range = ""
+          args = ["git", "log"]
+          if rev_range:
+              args.append(rev_range)
+          args.extend(["--pretty=format:%s"])
+          result = subprocess.run(args, check=True, capture_output=True, text=True)
+          messages = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+          if not messages:
+              messages = ["chore: maintenance"]
+
+          categories = {"Added": [], "Fixed": [], "Changed": []}
+          pattern = re.compile(r"^(?P<type>\w+)(?:\([^)]*\))?!?:\s*")
+
+          for message in messages:
+              clean = pattern.sub("", message)
+              lower = message.lower()
+              if lower.startswith("feat"):
+                  categories["Added"].append(clean)
+              elif lower.startswith("fix"):
+                  categories["Fixed"].append(clean)
+              else:
+                  categories["Changed"].append(clean)
+
+          entry_lines = [f"## v{new_version} - {datetime.date.today().isoformat()}\n"]
+          for section in ("Added", "Fixed", "Changed"):
+              items = categories[section]
+              if not items:
+                  continue
+              entry_lines.append(f"### {section}")
+              entry_lines.extend(f"- {item}" for item in items)
+              entry_lines.append("")
+          if len(entry_lines) == 1:
+              entry_lines.append("- Maintenance updates")
+          entry_lines.append("")
+          entry = "\n".join(entry_lines)
+
+          path = Path("CHANGELOG.md")
+          if path.exists():
+              text = path.read_text()
+              if text.startswith(header):
+                  body = text[len(header):].lstrip("\n")
+              else:
+                  body = text
+              new_text = header + entry + body
+          else:
+              new_text = header + entry
+          path.write_text(new_text)
+          """))
+          PY
+
 
       - name: Configure git
         if: steps.update.outputs.updated == 'true'

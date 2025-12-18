@@ -17,6 +17,12 @@ FastAPI + Keycloak–secured books API with Postgres, Vault, and a full observab
 - **CI**: unit tests with coverage on a Postgres service, SBOM via Syft, multi-arch image build to GHCR.
 - **Quality and Safety**: ruff/bandit/mypy, pip-audit, coverage upload, integration smoke (Keycloak/Tempo/Loki).
 - **Security**: gitleaks secret scan, CodeQL static analysis.
-- **Version bump**: workflow auto-creates `version-bump/v*` branches and opens PRs after force-syncing with `main`.
+- **Version bump**: workflow auto-creates `version-bump/v*` branches, updates `CHANGELOG.md`, and opens PRs after force-syncing with `main`.
+- **Tag & Release**: once the PR merges, `version-tag.yml` tags `v*` off `main`, which triggers `release.yml` to build images, attach SBOMs, and publish GitHub releases using the changelog entry.
+
+## Release process
+- All notable changes live in `CHANGELOG.md` under `## vMAJOR.MINOR.PATCH - YYYY-MM-DD` headings.
+- Version bump PRs should include the changelog entry; CI enforces this automatically.
+- After merging to `main`, tags (`v*`) are pushed automatically and the release workflow publishes artifacts plus release notes derived from the changelog.
 
 See `AGENTS.md` for deeper operational notes.

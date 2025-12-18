@@ -1,6 +1,6 @@
 # AGENTS GUIDE
 Agent-facing checklist for FastAPI books-api; treat as canonical.
-- Layout: runtime code stays in src/, mirrored tests in tests/, docs/ for ADRs, infra/terraform/* for IaC.
+- Layout: runtime code stays in src/, mirrored tests in tests/, docs/ for ADRs, infra/terraform/* for IaC, and `CHANGELOG.md` at repo root captures release history.
 - Config & tooling live at repo root (Makefile, docker-compose.yml, .env examples); keep modules cohesive/small.
 - docker compose up -d boots Postgres/Keycloak/Vault/observability before integration work.
 - make setup (uv venv + pinned requirements) precedes make dev (uvicorn honoring APP_DATABASE_URL env).
@@ -17,5 +17,7 @@ Agent-facing checklist for FastAPI books-api; treat as canonical.
 - DB changes go through alembic (make migrate / make migrate-stamp); alembic/versions/ retains chronological history.
 - Security hygiene: make audit (pip-audit) and make security-scan (bandit) are first-class; Vault secrets job plus terraform fmt/validate guard infra PRs.
 - CI: uv version is pinned/cached, lint/unit run before heavier docker/integration stages, security checks run as a parallel matrix, and vault_seed_smoke applies terraform against a dev Vault container.
-- Version bump workflow force-syncs `version-bump/v*` branches from `main`, pushes with `--force-with-lease`, and auto-opens PRs via `gh` after updating version files.
+- Version bump workflow force-syncs `version-bump/v*` branches from `main`, regenerates the changelog entry, pushes with `--force-with-lease`, and auto-opens PRs via `gh` after updating version files.
+- Releases: merging the bump PR triggers `version-tag.yml` to push the `v*` tag, which surfaces in `release.yml`—images are rebuilt, SBOMs/signatures are published, and release notes are taken directly from `CHANGELOG.md`.
+- Workflow hygiene: Python heredocs inside `.github/workflows/version-bump.yml` must stay indented and wrapped (we now run them via `python <<'PY'` + dedent), so future edits should follow the same pattern to avoid YAML parser errors.
 - No Cursor or Copilot instruction files exist; AGENTS.md is the authoritative playbook.

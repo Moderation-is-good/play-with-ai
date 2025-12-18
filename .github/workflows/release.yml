@@ -43,14 +43,28 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate changelog
+      - name: Extract changelog entry
         id: changelog
-        uses: orhun/git-cliff-action@v3
-        with:
-          config: cliff.toml
-          args: --latest --strip header
         env:
-          OUTPUT: CHANGELOG.md
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ['RELEASE_VERSION']
+          tag = version if version.startswith('v') else f"v{version}"
+          path = Path('CHANGELOG.md')
+          text = path.read_text() if path.exists() else ''
+          pattern = re.compile(rf"^##\s+{re.escape(tag)}[^\n]*\n(.*?)(?=^##\s+v|\Z)", re.MULTILINE | re.DOTALL)
+          match = pattern.search(text)
+          if match:
+              notes_body = match.group(0).strip()
+          else:
+              notes_body = f"## {tag}\n\n- Release {tag}"
+          Path('release-notes.md').write_text(notes_body)
+          PY
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -124,7 +138,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
-          body: ${{ steps.changelog.outputs.content }}
+          body_path: release-notes.md
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           files: |
