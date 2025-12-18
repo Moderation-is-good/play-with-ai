@@ -13,11 +13,44 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      docker: ${{ steps.filter.outputs.docker }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'src/**'
+              - 'tests/**'
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+              - 'setup.py'
+              - 'setup.cfg'
+            docker:
+              - 'Dockerfile'
+              - 'docker-compose*.yml'
+              - '.dockerignore'
+            terraform:
+              - 'infra/terraform/**'
+            ci:
+              - '.github/workflows/**'
+
   lint_and_test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'
     env:
       APP_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres
       POSTGRES_HOST: 127.0.0.1
@@ -47,10 +80,11 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-      - name: Install Postgres client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: postgresql-client
+          version: 1.0
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -82,7 +116,11 @@ jobs:
   integration_and_smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: lint_and_test
+    needs: [changes, lint_and_test]
+    if: |
+      always() &&
+      (needs.lint_and_test.result == 'success' || needs.lint_and_test.result == 'skipped') &&
+      (needs.changes.outputs.python == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -127,10 +165,11 @@ jobs:
           fi
       - name: Start core services for integration
         run: docker compose up -d db keycloak tempo otel-collector loki victoria-metrics pyroscope
-      - name: Install Postgres client (integration)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+      - name: Cache APT packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: postgresql-client
+          version: 1.0
       - name: Wait for Postgres
         run: |
           for i in {1..60}; do
@@ -240,7 +279,11 @@ jobs:
   docker_build_and_scan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: lint_and_test
+    needs: [changes, lint_and_test]
+    if: |
+      always() &&
+      (needs.lint_and_test.result == 'success' || needs.lint_and_test.result == 'skipped') &&
+      (needs.changes.outputs.python == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository }}
     steps:
@@ -263,6 +306,8 @@ jobs:
   terraform_check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true' || needs.changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -281,12 +326,53 @@ jobs:
   hadolint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || needs.changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - name: Hadolint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
+
+  dependency_review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+  pr_title:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^.{1,80}$
+          subjectPatternError: |
+            PR title must be 1-80 characters.
 
   # gitleaks:
   #   runs-on: ubuntu-latest
