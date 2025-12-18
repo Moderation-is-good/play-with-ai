@@ -64,3 +64,9 @@ This repo is intentionally lightweight; add new code using the structure below s
 - Tempo single-node config with local WAL/blocks; metrics-generator enabled via inline overrides; span-metrics and service-graph metrics are forwarded to VictoriaMetrics (series like `traces_spanmetrics_calls_total` present).
 - Grafana provisioning under `observability/grafana/` (datasource.yml, dashboard) includes traces→logs/metrics drilldowns; Loki derived fields match `traceid`/`trace_id`. Ports: Grafana 3000, Loki 3100, Tempo 3200/4317/4318, VM 8428, Keycloak 8080, Vault 8200, OTLP 4318, Pyroscope 4040.
 - App profiling: set `PYROSCOPE_SERVER_ADDRESS`/`PYROSCOPE_APP_NAME` (defaults to `books-api`) to send profiles to Pyroscope. Logs and traces link in Grafana; Tempo trace fetch via `http://localhost:3200/api/traces/{id}` works.
+
+## Agent Notes (CI/CD)
+- `ci.yml` and `quality.yml` use GitHub Actions with Postgres service; health checks and explicit `pg_isready` waits were added to avoid connection-refused errors.
+- `quality.yml` writes a fallback `.env` inline if `.env.example` is absent; integration job installs the Postgres client before health checks.
+- Pip audit now passes after replacing `python-jose` with `pyjwt[crypto]` (removes vulnerable `ecdsa`), and FastAPI/Starlette bumped to `fastapi==0.121.3`.
+- Dockerfile tweaked for hadolint: `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` and DL3008 ignored on apt install.

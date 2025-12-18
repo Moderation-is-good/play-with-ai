@@ -123,13 +123,17 @@ jobs:
         run: |
           sleep 30
           curl -sf http://localhost:8080/realms/books/.well-known/openid-configuration >/dev/null
-          for i in {1..60}; do
+          for i in {1..90}; do
             if pg_isready -h 127.0.0.1 -p 5432 -U postgres; then
               exit 0
             fi
+            echo "postgres:5432 - still waiting (${i})"
+            docker compose ps db || true
             sleep 2
           done
           echo "Postgres did not become ready for integration tests" >&2
+          docker compose ps || true
+          docker compose logs db || true
           exit 1
       - name: Install test deps
         run: |
@@ -185,7 +189,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: local/build:latest
           severity: CRITICAL,HIGH
