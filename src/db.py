@@ -12,7 +12,7 @@ _engine = None
 _SessionLocal = None
 
 
-def get_engine(url: Optional[str] = None):
+def get_engine(url: str | None = None):
     global _engine
     if _engine is None:
         settings = get_settings()

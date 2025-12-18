@@ -36,7 +36,10 @@ class Settings(BaseSettings):
     vault_addr: str | None = None
     vault_token: str | None = None
     vault_kv_mount: str = "kv"
-    vault_secret_path: str = "books-api/config"
+    vault_secret_path: str = Field(
+        default="books-api/config",
+        description="Vault KV path for app secrets (default is a placeholder for local/dev).",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="APP_",
@@ -63,7 +66,9 @@ def get_settings() -> Settings:
         insecure_markers = ("postgres:postgres@", "changeme", "change-me", "replace-me", "root@")
         if settings.database_url and any(marker in settings.database_url for marker in insecure_markers):
             raise RuntimeError("Insecure database credentials detected")
-        if settings.keycloak_client_secret and any(marker in settings.keycloak_client_secret for marker in insecure_markers):
+        if settings.keycloak_client_secret and any(
+            marker in settings.keycloak_client_secret for marker in insecure_markers
+        ):
             raise RuntimeError("Insecure client secret detected")
         if settings.vault_token and settings.vault_token.lower() == "root":
             raise RuntimeError("Insecure Vault token detected")
