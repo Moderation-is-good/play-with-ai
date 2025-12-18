@@ -1,0 +1,74 @@
+name: Welcome New Contributors
+
+on:
+  pull_request_target:
+    types: [opened]
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check if first contribution
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            AUTHOR="${{ github.event.pull_request.user.login }}"
+            # Check for previous PRs
+            COUNT=$(gh pr list --author "$AUTHOR" --repo "${{ github.repository }}" --state all --limit 100 --json number | jq length)
+          else
+            AUTHOR="${{ github.event.issue.user.login }}"
+            # Check for previous issues
+            COUNT=$(gh issue list --author "$AUTHOR" --repo "${{ github.repository }}" --state all --limit 100 --json number | jq length)
+          fi
+
+          if [ "$COUNT" -le 1 ]; then
+            echo "is_first=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_first=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Welcome first-time PR contributor
+        if: github.event_name == 'pull_request_target' && steps.check.outputs.is_first == 'true'
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "👋 **Welcome @${{ github.event.pull_request.user.login }}!**
+
+          Thank you for your first pull request to this project! 🎉
+
+          A maintainer will review your changes soon. In the meantime, please make sure:
+
+          - [ ] All CI checks pass
+          - [ ] Your PR title follows [Conventional Commits](https://www.conventionalcommits.org/)
+          - [ ] You've added tests for new functionality
+          - [ ] Documentation is updated if needed
+
+          If you have any questions, feel free to ask. We're happy to help!
+
+          Thanks for contributing! 💙"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Welcome first-time issue author
+        if: github.event_name == 'issues' && steps.check.outputs.is_first == 'true'
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "👋 **Welcome @${{ github.event.issue.user.login }}!**
+
+          Thank you for opening your first issue! 🎉
+
+          A maintainer will look into this soon. To help us address your issue quickly:
+
+          - Make sure you've provided all the requested information
+          - Add any relevant logs or screenshots
+          - Check if there are similar existing issues
+
+          Thanks for contributing! 💙"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

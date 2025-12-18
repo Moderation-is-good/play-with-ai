@@ -1,0 +1,127 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version/tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://staging.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Deploying ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }} to staging"
+          # Add your deployment commands here, e.g.:
+          # kubectl set image deployment/books-api books-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
+          # or
+          # ssh staging "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }} && docker-compose up -d"
+
+      - name: Health check
+        run: |
+          echo "🏥 Running health check..."
+          # Add health check, e.g.:
+          # curl -sf https://staging.example.com/api/v1/health || exit 1
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "📢 Staging deployment ${{ job.status }}"
+
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create deployment record
+        run: |
+          echo "📝 Recording deployment: version=${{ steps.version.outputs.tag }}, time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }} to production"
+          # Add your deployment commands here
+
+      - name: Health check
+        run: |
+          echo "🏥 Running health check..."
+          # curl -sf https://example.com/api/v1/health || exit 1
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "📢 Production deployment ${{ job.status }}"

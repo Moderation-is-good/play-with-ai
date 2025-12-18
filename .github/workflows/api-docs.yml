@@ -1,0 +1,114 @@
+name: API Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres
+      APP_KEYCLOAK_ISSUER: https://localhost/realms/books
+      APP_JWKS_URL: http://localhost:8080/realms/books/protocol/openid-connect/certs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate OpenAPI spec
+        run: |
+          python - << 'EOF'
+          import json
+          import sys
+          sys.path.insert(0, '.')
+
+          # Mock the database and auth for spec generation
+          import unittest.mock as mock
+
+          with mock.patch('src.db.init_db'), \
+               mock.patch('src.auth.JWKSCache.get_keys', return_value={}):
+              from src.app import app
+              openapi_spec = app.openapi()
+
+          with open('openapi.json', 'w') as f:
+              json.dump(openapi_spec, f, indent=2)
+
+          print("OpenAPI spec generated successfully")
+          EOF
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Generate HTML documentation
+        run: |
+          pip install redoc-cli || npm install -g redoc-cli || true
+
+          # Create docs directory
+          mkdir -p docs/api
+
+          # Generate Redoc HTML
+          cat > docs/api/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Books API Documentation</title>
+              <meta charset="utf-8"/>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+              <style>
+                  body { margin: 0; padding: 0; }
+              </style>
+          </head>
+          <body>
+              <redoc spec-url='openapi.json'></redoc>
+              <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+          </body>
+          </html>
+          HTMLEOF
+
+          # Copy OpenAPI spec to docs
+          cp openapi.json docs/api/
+
+      - name: Upload OpenAPI spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.json
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/api/
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/api
+          destination_dir: api
