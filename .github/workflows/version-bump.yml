@@ -169,37 +169,57 @@ jobs:
       - name: Commit and push branch
         if: steps.update.outputs.updated == 'true'
         id: push
+        env:
+          NEW_VERSION: ${{ needs.determine-bump.outputs.new_version }}
         run: |
-          BRANCH="version-bump/v${{ needs.determine-bump.outputs.new_version }}"
-          git checkout -b "$BRANCH"
+          set -euo pipefail
+          BRANCH="version-bump/v${NEW_VERSION}"
+          git fetch origin main --depth=1
+          git checkout -B "$BRANCH" origin/main
           git add -A
-          git commit -m "chore: bump version to v${{ needs.determine-bump.outputs.new_version }}"
-          git push origin "$BRANCH"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump version to v${NEW_VERSION}"
+          git push --force-with-lease origin "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
-      - name: Output PR creation link
-        if: steps.update.outputs.updated == 'true'
+      - name: Create or update PR
+        if: steps.push.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.determine-bump.outputs.new_version }}
+          CURRENT_VERSION: ${{ needs.determine-bump.outputs.current_version }}
+          BUMP_TYPE: ${{ needs.determine-bump.outputs.bump_type }}
+        run: |
+          set -euo pipefail
+          BRANCH="${{ steps.push.outputs.branch }}"
+          TITLE="chore: bump version to v${NEW_VERSION}"
+          BODY_FILE="pr-body.md"
+          printf '## Summary\n- bump version from v%s to v%s\n- bump type: %s\n- generated automatically by Version Bump workflow\n' "$CURRENT_VERSION" "$NEW_VERSION" "$BUMP_TYPE" > "$BODY_FILE"
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE"
+          else
+            echo "PR #$EXISTING_PR already open for $BRANCH"
+          fi
+
+      - name: Output PR details
+        if: steps.push.outputs.branch != ''
         run: |
           NEW_VERSION="${{ needs.determine-bump.outputs.new_version }}"
           CURRENT_VERSION="${{ needs.determine-bump.outputs.current_version }}"
           BUMP_TYPE="${{ needs.determine-bump.outputs.bump_type }}"
           BRANCH="${{ steps.push.outputs.branch }}"
 
-          # Create PR URL with pre-filled title and body
-          TITLE="chore: bump version to v${NEW_VERSION}"
-          PR_URL="${{ github.server_url }}/${{ github.repository }}/compare/main...${BRANCH}?expand=1&title=${TITLE}"
-
-          echo "## Version Bump Ready" >> $GITHUB_STEP_SUMMARY
+          echo "## Version Bump" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Current | New | Type |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-----|------|" >> $GITHUB_STEP_SUMMARY
           echo "| v${CURRENT_VERSION} | v${NEW_VERSION} | ${BUMP_TYPE} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Create Pull Request" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Branch \`${BRANCH}\` has been pushed." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "[**Click here to create the PR**](${PR_URL})" >> $GITHUB_STEP_SUMMARY
+          echo "Branch \`${BRANCH}\` has been pushed. PR was created/updated automatically." >> $GITHUB_STEP_SUMMARY
 
       - name: No updates needed
         if: steps.update.outputs.updated != 'true'

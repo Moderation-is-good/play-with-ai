@@ -17,4 +17,5 @@ Agent-facing checklist for FastAPI books-api; treat as canonical.
 - DB changes go through alembic (make migrate / make migrate-stamp); alembic/versions/ retains chronological history.
 - Security hygiene: make audit (pip-audit) and make security-scan (bandit) are first-class; Vault secrets job plus terraform fmt/validate guard infra PRs.
 - CI: uv version is pinned/cached, lint/unit run before heavier docker/integration stages, security checks run as a parallel matrix, and vault_seed_smoke applies terraform against a dev Vault container.
+- Version bump workflow force-syncs `version-bump/v*` branches from `main`, pushes with `--force-with-lease`, and auto-opens PRs via `gh` after updating version files.
 - No Cursor or Copilot instruction files exist; AGENTS.md is the authoritative playbook.

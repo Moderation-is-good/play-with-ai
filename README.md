@@ -17,5 +17,6 @@ FastAPI + Keycloak–secured books API with Postgres, Vault, and a full observab
 - **CI**: unit tests with coverage on a Postgres service, SBOM via Syft, multi-arch image build to GHCR.
 - **Quality and Safety**: ruff/bandit/mypy, pip-audit, coverage upload, integration smoke (Keycloak/Tempo/Loki).
 - **Security**: gitleaks secret scan, CodeQL static analysis.
+- **Version bump**: workflow auto-creates `version-bump/v*` branches and opens PRs after force-syncing with `main`.
 
 See `AGENTS.md` for deeper operational notes.
