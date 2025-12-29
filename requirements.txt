@@ -14,7 +14,7 @@ ruff==0.6.9
 mypy==1.11.2
 pip-audit==2.7.3
 opentelemetry-api==1.27.0
-opentelemetry-sdk==1.27.0
+opentelemetry-sdk==1.39.1
 opentelemetry-exporter-otlp==1.27.0
 opentelemetry-instrumentation-fastapi==0.48b0
 opentelemetry-instrumentation-httpx==0.60b1
