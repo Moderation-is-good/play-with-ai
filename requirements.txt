@@ -7,7 +7,7 @@ SQLAlchemy==2.0.46
 psycopg==3.3.2
 pytest==9.0.2
 pytest-cov==7.0.0
-alembic==1.18.1
+alembic==1.18.3
 hypothesis==6.151.5
 bandit==1.9.3
 ruff==0.15.0
