@@ -20,4 +20,4 @@ opentelemetry-instrumentation-fastapi==0.60b1
 opentelemetry-instrumentation-httpx==0.60b1
 opentelemetry-instrumentation-logging==0.60b1
 opentelemetry-instrumentation-urllib==0.60b1
-pyroscope-io==0.8.15
+pyroscope-io==1.0.4
