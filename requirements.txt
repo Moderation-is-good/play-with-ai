@@ -19,5 +19,5 @@ opentelemetry-exporter-otlp==1.39.1
 opentelemetry-instrumentation-fastapi==0.60b1
 opentelemetry-instrumentation-httpx==0.60b1
 opentelemetry-instrumentation-logging==0.60b1
-opentelemetry-instrumentation-urllib==0.60b1
+opentelemetry-instrumentation-urllib==0.61b0
 pyroscope-io==0.8.15
