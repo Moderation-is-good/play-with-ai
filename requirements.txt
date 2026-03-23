@@ -3,7 +3,7 @@ uvicorn[standard]==0.42.0
 pyjwt[crypto]==2.12.1
 httpx==0.28.1
 pydantic-settings==2.13.1
-SQLAlchemy==2.0.47
+SQLAlchemy==2.0.48
 psycopg==3.3.3
 pytest==9.0.2
 pytest-cov==7.1.0
