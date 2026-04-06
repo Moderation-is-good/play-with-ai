@@ -10,8 +10,8 @@ pytest-cov==7.1.0
 alembic==1.18.4
 hypothesis==6.151.10
 bandit==1.9.4
-ruff==0.15.8
-mypy==1.19.1
+ruff==0.15.9
+mypy==1.20.0
 pip-audit==2.10.0
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
