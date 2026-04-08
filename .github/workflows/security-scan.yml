@@ -61,7 +61,7 @@ jobs:
           cache-from: type=gha
 
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: local/security-scan:latest
           format: 'sarif'
@@ -73,7 +73,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
       - name: Trivy scan (table output)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: local/security-scan:latest
           format: 'table'
