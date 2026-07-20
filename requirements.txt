@@ -18,6 +18,6 @@ opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp==1.43.0
 opentelemetry-instrumentation-fastapi==0.65b0
 opentelemetry-instrumentation-httpx==0.64b0
-opentelemetry-instrumentation-logging==0.64b0
+opentelemetry-instrumentation-logging==0.65b0
 opentelemetry-instrumentation-urllib==0.65b0
 pyroscope-io==0.8.15
