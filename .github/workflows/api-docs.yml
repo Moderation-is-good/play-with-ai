@@ -27,7 +27,7 @@ jobs:
       APP_KEYCLOAK_ISSUER: https://localhost/realms/books
       APP_JWKS_URL: http://localhost:8080/realms/books/protocol/openid-connect/certs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v5
