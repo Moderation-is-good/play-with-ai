@@ -1,5 +1,5 @@
 # Multi-stage build for FastAPI app using uv (no global pip) and non-root runtime
-FROM python:3.14-slim AS builder
+FROM python:3.15-slim AS builder
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -52,7 +52,7 @@ if version_dir.exists():
 PY
 
 # Runtime image stays slim and non-root
-FROM python:3.14-slim AS runtime
+FROM python:3.15-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
