@@ -44,7 +44,7 @@ jobs:
       name: staging
       url: https://staging.example.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine version
         id: version
@@ -89,7 +89,7 @@ jobs:
       name: production
       url: https://example.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine version
         id: version

@@ -20,12 +20,12 @@ jobs:
       APP_JWKS_URL: http://localhost:8080/realms/books/protocol/openid-connect/certs
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: pr
 
       - name: Checkout base branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           path: base
